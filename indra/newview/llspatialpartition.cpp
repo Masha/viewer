@@ -1969,12 +1969,11 @@ void renderNormals(LLDrawable *drawablep)
 
     LLVertexBuffer::unbind();
 
+	LLViewerObject* obj = drawablep->getVObj();
     LLVOVolume *vol = drawablep->getVOVolume();
 
-    if (vol)
+	if (obj)
     {
-        LLVolume *volume = vol->getVolume();
-
         // Drawable's normals & tangents are stored in model space, i.e. before any scaling is applied.
         //
         // SL-13490, using pos + normal to compute the 2nd vertex of a normal line segment doesn't
@@ -1982,68 +1981,166 @@ void renderNormals(LLDrawable *drawablep)
         // transform. We get that effect here by pre-applying the inverse scale (twice, because
         // one forward scale will be re-applied via the MVP in the vertex shader)
 
-        LLVector3  scale_v3 = vol->getScale();
-        float      scale_len = scale_v3.length();
-        LLVector4a obj_scale(scale_v3.mV[VX], scale_v3.mV[VY], scale_v3.mV[VZ]);
-        obj_scale.normalize3();
+        LLVector4a inv_scale;
+		float scale_len;
+        if (vol)
+        {
+            LLVector3  scale_v3 = vol->getScale();
+            LLVector4a obj_scale(scale_v3.mV[VX], scale_v3.mV[VY], scale_v3.mV[VZ]);
+            obj_scale.normalize3();
+
+            // Create inverse-scale vector for normals
+            inv_scale.set(1.0 / scale_v3.mV[VX], 1.0 / scale_v3.mV[VY], 1.0 / scale_v3.mV[VZ], 0.0);
+            inv_scale.mul(inv_scale);  // Squared, to apply inverse scale twice
+
+            inv_scale.normalize3fast();
+			scale_len = scale_v3.length();
+        }
+        else
+        {
+			inv_scale.set(1.0, 1.0, 1.0, 0.0);
+			scale_len = 1.0;
+        }
+
+        gGL.pushMatrix();
+        if (vol)
+        {
+            gGL.multMatrix((F32 *) vol->getRelativeXform().mMatrix);
+        }
+
+        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
         // Normals &tangent line segments get scaled along with the object. Divide by scale length
         // to keep the as-viewed lengths (relatively) constant with the debug setting length
         float draw_length = gSavedSettings.getF32("RenderDebugNormalScale") / scale_len;
 
-        // Create inverse-scale vector for normals
-        LLVector4a inv_scale(1.0 / scale_v3.mV[VX], 1.0 / scale_v3.mV[VY], 1.0 / scale_v3.mV[VZ]);
-        inv_scale.mul(inv_scale);  // Squared, to apply inverse scale twice
-        inv_scale.normalize3fast();
-
-        gGL.pushMatrix();
-        gGL.multMatrix((F32 *) vol->getRelativeXform().mMatrix);
-
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-
-        for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+        std::vector<LLVolumeFace>* faces = nullptr;
+		std::vector<LLFace*>* drawable_faces = nullptr;
+        if (vol)
         {
-            const LLVolumeFace &face = volume->getVolumeFace(i);
-
-            gGL.flush();
-            gGL.diffuseColor4f(1, 1, 0, 1);
-            gGL.begin(LLRender::LINES);
-            for (S32 j = 0; j < face.mNumVertices; ++j)
-            {
-                LLVector4a n, p;
-
-                n.setMul(face.mNormals[j], 1.0);
-                n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
-                n.normalize3fast();
-                n.mul(draw_length);
-                p.setAdd(face.mPositions[j], n);
-
-                gGL.vertex3fv(face.mPositions[j].getF32ptr());
-                gGL.vertex3fv(p.getF32ptr());
-            }
-            gGL.end();
-
-            // Tangents are simple vectors and do not require reorientation via pre-scaling
-            if (face.mTangents)
-            {
-                gGL.flush();
-                gGL.diffuseColor4f(0, 1, 1, 1);
-                gGL.begin(LLRender::LINES);
-                for (S32 j = 0; j < face.mNumVertices; ++j)
-                {
-                    LLVector4a t, p;
-
-                    t.setMul(face.mTangents[j], 1.0f);
-                    t.normalize3fast();
-                    t.mul(draw_length);
-                    p.setAdd(face.mPositions[j], t);
-
-                    gGL.vertex3fv(face.mPositions[j].getF32ptr());
-                    gGL.vertex3fv(p.getF32ptr());
-                }
-                gGL.end();
-            }
+            LLVolume* volume = vol->getVolume();
+            faces = &volume->getVolumeFaces();
         }
+        else
+        {
+			drawable_faces = &drawablep->getFaces();
+        }
+
+		if (faces)
+		{
+			for (auto it = faces->begin(); it != faces->end(); ++it)
+			{
+				const LLVolumeFace& face = *it;
+
+				gGL.flush();
+				gGL.diffuseColor4f(1, 1, 0, 1);
+				gGL.begin(LLRender::LINES);
+				for (S32 j = 0; j < face.mNumVertices; ++j)
+				{
+					LLVector4a n, p;
+
+					n.setMul(face.mNormals[j], 1.0);
+					n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
+					n.normalize3fast();
+					n.mul(draw_length);
+					p.setAdd(face.mPositions[j], n);
+
+					gGL.vertex3fv(face.mPositions[j].getF32ptr());
+					gGL.vertex3fv(p.getF32ptr());
+				}
+				gGL.end();
+
+				// Tangents are simple vectors and do not require reorientation via pre-scaling
+				if (face.mTangents)
+				{
+					gGL.flush();
+					gGL.diffuseColor4f(0, 1, 1, 1);
+					gGL.begin(LLRender::LINES);
+					for (S32 j = 0; j < face.mNumVertices; ++j)
+					{
+						LLVector4a t, p;
+
+						t.setMul(face.mTangents[j], 1.0f);
+						t.normalize3fast();
+						t.mul(draw_length);
+						p.setAdd(face.mPositions[j], t);
+
+						gGL.vertex3fv(face.mPositions[j].getF32ptr());
+						gGL.vertex3fv(p.getF32ptr());
+					}
+					gGL.end();
+				}
+			}
+		}
+		else if (drawable_faces)
+		{
+			for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
+			{
+				LLFace& face = **it;
+				LLVertexBuffer* buf = face.getVertexBuffer();
+				if (!buf) { continue; }
+
+				// TODO: Using vertex buffer striders here is very inefficient - should ideally use a shader.
+				LLStrider<LLVector4a> vertex_strider_start;
+				buf->getVertexStrider(vertex_strider_start);
+
+				gGL.flush();
+				gGL.diffuseColor4f(1, 1, 0, 1);
+				gGL.begin(LLRender::LINES);
+				U32 mask_vn = LLVertexBuffer::TYPE_VERTEX | LLVertexBuffer::TYPE_NORMAL;
+				if ((buf->getTypeMask() & mask_vn) == mask_vn)
+				{
+					LLStrider<LLVector3> normal_strider;
+					buf->getNormalStrider(normal_strider);
+					LLStrider<LLVector4a> vertex_strider = vertex_strider_start;
+					for (S32 j = 0; j < buf->getNumVerts(); ++j)
+					{
+						const LLVector4a& vert = *(vertex_strider++);
+						const LLVector3& norm = *(normal_strider++);
+						LLVector4a n, p;
+
+						n.set(norm.mV[VX], norm.mV[VY], norm.mV[VZ], 1.0);
+						n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
+						n.normalize3fast();
+						n.mul(draw_length);
+						p.setAdd(vert, n);
+
+						gGL.vertex3fv(vert.getF32ptr());
+						gGL.vertex3fv(p.getF32ptr());
+					}
+				}
+				gGL.end();
+
+				U32 mask_vt = LLVertexBuffer::TYPE_VERTEX | LLVertexBuffer::TYPE_TANGENT;
+				// Tangents are simple vectors and do not require reorientation via pre-scaling
+				if ((buf->getTypeMask() & mask_vt) == mask_vt)
+				{
+					LLStrider<LLVector4a> tangent_strider;
+					buf->getTangentStrider(tangent_strider);
+					LLStrider<LLVector4a> vertex_strider = vertex_strider_start;
+
+					gGL.flush();
+					gGL.diffuseColor4f(0, 1, 1, 1);
+					gGL.begin(LLRender::LINES);
+					for (S32 j = 0; j < buf->getNumVerts(); ++j)
+					{
+						const LLVector4a& vert = *(vertex_strider++);
+						LLVector4a t, p;
+
+						t.setMul(*(tangent_strider++), 1.0f);
+						t.normalize3fast();
+						t.mul(draw_length);
+						p.setAdd(vert, t);
+
+						gGL.vertex3fv(vert.getF32ptr());
+						gGL.vertex3fv(p.getF32ptr());
+					}
+					gGL.end();
+				}
+
+				buf->unmapBuffer(); // TODO: Remove after removing the strider stuff
+			}
+		}
 
         gGL.popMatrix();
     }
