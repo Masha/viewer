@@ -47,6 +47,7 @@
 #include "pipeline.h"
 #include "llmeshrepository.h"
 #include "llrender.h"
+#include "lldrawpool.h"
 #include "lloctree.h"
 #include "llphysicsshapebuilderutil.h"
 #include "llvoavatar.h"
@@ -1974,6 +1975,12 @@ void renderNormals(LLDrawable *drawablep)
 
 	if (obj)
     {
+		LLGLEnable blend(GL_BLEND); // TODO: Test (possibly not needed?)
+        //LLGLDisable cull(GL_CULL_FACE); // TODO: Test (possibly not needed?)
+        LLGLDisable cull(GL_CULL_FACE); // TODO: Test (possibly not needed?)
+        LLGLDepthTest gl_depth(GL_TRUE, GL_FALSE); // TODO: Test (this one has issues)
+        //LLGLDepthTest gl_depth(GL_FALSE, GL_FALSE, GL_ALWAYS); // TODO: Test (this one shows everything)
+
         // Drawable's normals & tangents are stored in model space, i.e. before any scaling is applied.
         //
         // SL-13490, using pos + normal to compute the 2nd vertex of a normal line segment doesn't
@@ -2074,6 +2081,7 @@ void renderNormals(LLDrawable *drawablep)
 		}
 		else if (drawable_faces)
 		{
+#if 0 // TODO: If things go well, remove this version. (Note: Currently, below version does not render normals, and is missing some important scale info needed to render them (normal scale comes to mind, but there may be other things))
 			for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
 			{
 				LLFace& face = **it;
@@ -2140,6 +2148,37 @@ void renderNormals(LLDrawable *drawablep)
 
 				buf->unmapBuffer(); // TODO: Remove after removing the strider stuff
 			}
+#else
+            for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
+            {
+                LLFace* facep = *it;
+                LLFace& face = **it;
+                LLVertexBuffer* buf = face.getVertexBuffer();
+                if (!buf) { continue; }
+				U32 mask_vn = LLVertexBuffer::TYPE_VERTEX | LLVertexBuffer::TYPE_NORMAL;
+                if ((buf->getTypeMask() & mask_vn) != mask_vn) { continue; }
+
+                LLGLSLShader* shader;
+                if ((buf->getTypeMask() & LLVertexBuffer::TYPE_TANGENT) != LLVertexBuffer::TYPE_TANGENT)
+                {
+                    shader = &gNormalDebugProgram[NORMAL_DEBUG_SHADER_DEFAULT];
+                }
+                else
+                {
+                    shader = &gNormalDebugProgram[NORMAL_DEBUG_SHADER_WITH_TANGENTS];
+                }
+                shader->bind();
+
+                shader->uniform1f(LLShaderMgr::DEBUG_NORMAL_DRAW_LENGTH, draw_length);
+                LLColor4 test_terrain_color(1.0, 1.0, 1.0, 0.5);
+                shader->uniform4f(LLShaderMgr::DIFFUSE_COLOR, test_terrain_color.mV[VX], test_terrain_color.mV[VY], test_terrain_color.mV[VZ], test_terrain_color.mV[VW]);
+
+                LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
+
+                facep->renderIndexed();
+            }
+            gGL.flush(); // TODO: Decide if needed; intent is to force write to final buffer
+#endif
 		}
 
         gGL.popMatrix();
