@@ -1,5 +1,5 @@
 /** 
- * @file debugF.glsl
+ * @file normaldebugF.glsl
  *
  * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,16 +25,9 @@
 
 out vec4 frag_color;
 
-uniform vec4 color;
-#if HAS_ATTRIBUTE_TANGENT == 1 // TODO: Remove
-in vec3 tangent_color;
-#endif
+in vec4 vertex_color;
 
 void main() 
 {
-#if HAS_ATTRIBUTE_TANGENT == 1 // TODO: Remove this case
-	frag_color = max(color * vec4(tangent_color.xyz, 1), vec4(0));
-#else
-	frag_color = max(color, vec4(0));
-#endif
+	frag_color = max(vertex_color, vec4(0));
 }

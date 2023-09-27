@@ -1975,11 +1975,8 @@ void renderNormals(LLDrawable *drawablep)
 
 	if (obj)
     {
-		LLGLEnable blend(GL_BLEND); // TODO: Test (possibly not needed?)
-        //LLGLDisable cull(GL_CULL_FACE); // TODO: Test (possibly not needed?)
-        LLGLDisable cull(GL_CULL_FACE); // TODO: Test (possibly not needed?)
-        LLGLDepthTest gl_depth(GL_TRUE, GL_FALSE); // TODO: Test (this one has issues)
-        //LLGLDepthTest gl_depth(GL_FALSE, GL_FALSE, GL_ALWAYS); // TODO: Test (this one shows everything)
+		LLGLEnable blend(GL_BLEND);
+        LLGLDepthTest gl_depth(GL_TRUE, GL_FALSE);
 
         // Drawable's normals & tangents are stored in model space, i.e. before any scaling is applied.
         //
@@ -2081,14 +2078,13 @@ void renderNormals(LLDrawable *drawablep)
 		}
 		else if (drawable_faces)
 		{
-#if 0 // TODO: If things go well, remove this version. (Note: Currently, below version does not render normals, and is missing some important scale info needed to render them (normal scale comes to mind, but there may be other things))
+#if 0 // TODO: If things go well, remove this version.
 			for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
 			{
 				LLFace& face = **it;
 				LLVertexBuffer* buf = face.getVertexBuffer();
 				if (!buf) { continue; }
 
-				// TODO: Using vertex buffer striders here is very inefficient - should ideally use a shader.
 				LLStrider<LLVector4a> vertex_strider_start;
 				buf->getVertexStrider(vertex_strider_start);
 
@@ -2146,9 +2142,12 @@ void renderNormals(LLDrawable *drawablep)
 					gGL.end();
 				}
 
-				buf->unmapBuffer(); // TODO: Remove after removing the strider stuff
+				buf->unmapBuffer();
 			}
 #else
+			// *HACK: Prepare to restore previous shader as other debug code depends on a simpler shader being present
+			llassert(LLGLSLShader::sCurBoundShaderPtr == &gDebugProgram);
+			LLGLSLShader* prev_shader = LLGLSLShader::sCurBoundShaderPtr;
             for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
             {
                 LLFace* facep = *it;
@@ -2170,14 +2169,19 @@ void renderNormals(LLDrawable *drawablep)
                 shader->bind();
 
                 shader->uniform1f(LLShaderMgr::DEBUG_NORMAL_DRAW_LENGTH, draw_length);
-                LLColor4 test_terrain_color(1.0, 1.0, 1.0, 0.5);
-                shader->uniform4f(LLShaderMgr::DIFFUSE_COLOR, test_terrain_color.mV[VX], test_terrain_color.mV[VY], test_terrain_color.mV[VZ], test_terrain_color.mV[VW]);
 
                 LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
 
-                facep->renderIndexed();
+                buf->setBuffer();
+                // *NOTE: The render type in the vertex shader is TRIANGLES, but gets converted to LINES in the geometry shader
+                // *NOTE: For terrain normal debug, this seems to also include vertices for water, which is technically not part of the terrain. Should fix that at some point.
+                buf->drawRange(LLRender::TRIANGLES, face.getGeomIndex(), face.getGeomIndex() + face.getGeomCount()-1, face.getIndicesCount(), face.getIndicesStart());
             }
-            gGL.flush(); // TODO: Decide if needed; intent is to force write to final buffer
+			if (prev_shader)
+			{
+				prev_shader->bind();
+			}
+			gDebugProgram.bind();
 #endif
 		}
 

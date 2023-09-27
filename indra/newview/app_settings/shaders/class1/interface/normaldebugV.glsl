@@ -1,5 +1,5 @@
 /** 
- * @file debugV.glsl
+ * @file normaldebugV.glsl
  *
  * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -25,44 +25,50 @@
 
 in vec3 position;
 in vec3 normal;
+out vec4 normal_g;
 #if HAS_ATTRIBUTE_TANGENT == 1
 in vec4 tangent;
-out vec3 tangent_color;
+out vec4 tangent_g;
 #endif
 
 uniform float debug_normal_draw_length;
 
 #ifdef HAS_SKIN
 mat4 getObjectSkinnedTransform();
-uniform mat4 projection_matrix;
-uniform mat4 modelview_matrix;
 #else
 uniform mat3 normal_matrix;
-uniform mat4 modelview_projection_matrix;
 #endif
+uniform mat4 projection_matrix;
+uniform mat4 modelview_matrix;
+
+// *NOTE: Should use the modelview_projection_matrix here in the non-skinned
+// case for efficiency, but opting for the simplier implementation for now as
+// this is debug code. Also, the skinned version hasn't beeen tested yet.
+// world_pos = mat * vec4(position.xyz, 1.0)
+vec4 get_screen_normal(vec3 position, vec4 world_pos, vec3 normal, mat4 mat)
+{
+    vec4 world_norm = mat * vec4((position + normal), 1.0);
+    world_norm.xyz -= world_pos.xyz;
+    world_norm.xyz = debug_normal_draw_length * normalize(world_norm.xyz);
+    world_norm.xyz += world_pos.xyz;
+    return projection_matrix * world_norm;
+}
 
 void main()
 {
-    vec3 scaled_normal = debug_normal_draw_length * normal.xyz;
 #ifdef HAS_SKIN
     mat4 mat = getObjectSkinnedTransform();
     mat = modelview_matrix * mat;
-    vec4 world_pos = mat * vec4(position.xyz,1.0);
-    vec4 screen_pos = projection_matrix * world_pos;
-	vec4 screen_normal = mat*vec4(scaled_normal.xyz+position.xyz,1.0);
-#if HAS_ATTRIBUTE_TANGENT == 1
-	vec3 screen_tangent = normalize((mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-world_pos.xyz);
-#endif
 #else
-	vec4 screen_pos = modelview_projection_matrix * vec4(position.xyz, 1.0);
-	vec4 screen_normal = modelview_projection_matrix*vec4(scaled_normal.xyz+position.xyz,1.0);
+#define mat modelview_matrix
+#endif
+
+    vec4 world_pos = mat * vec4(position.xyz,1.0);
+
+	gl_Position = projection_matrix * world_pos;
+	normal_g = get_screen_normal(position.xyz, world_pos, normal.xyz, mat);
 #if HAS_ATTRIBUTE_TANGENT == 1
-	vec3 screen_tangent = normalize(normal_matrix * tangent.xyz);
+	tangent_g = get_screen_normal(position.xyz, world_pos, tangent.xyz, mat);
 #endif
-#endif
-#if HAS_ATTRIBUTE_TANGENT == 1 // TODO: Remove
-    tangent_color = (screen_tangent.xyz + 2.0) * 0.5;
-#endif
-    gl_Position = screen_normal;
 }
 
