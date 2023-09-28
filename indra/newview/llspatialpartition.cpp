@@ -1962,7 +1962,11 @@ void renderBoundingBox(LLDrawable* drawable, BOOL set_color = TRUE)
 		drawBoxOutline(pos,size);
 	}
 }
-
+// *TODO: LLDrawables which are not part of LLVOVolumes fall into a different
+// code path which uses a shader - it was tested to be faster than mapping a
+// vertex buffer in the terrain case. Consider using it for LLVOVolumes as well
+// to simplify and speed up this debug code. Alternatively, a compute shader is
+// likely faster. -Cosmic,2023-09-28
 void renderNormals(LLDrawable *drawablep)
 {
     if (!drawablep->isVisible())
@@ -2078,73 +2082,6 @@ void renderNormals(LLDrawable *drawablep)
 		}
 		else if (drawable_faces)
 		{
-#if 0 // TODO: If things go well, remove this version.
-			for (auto it = drawable_faces->begin(); it != drawable_faces->end(); ++it)
-			{
-				LLFace& face = **it;
-				LLVertexBuffer* buf = face.getVertexBuffer();
-				if (!buf) { continue; }
-
-				LLStrider<LLVector4a> vertex_strider_start;
-				buf->getVertexStrider(vertex_strider_start);
-
-				gGL.flush();
-				gGL.diffuseColor4f(1, 1, 0, 1);
-				gGL.begin(LLRender::LINES);
-				U32 mask_vn = LLVertexBuffer::TYPE_VERTEX | LLVertexBuffer::TYPE_NORMAL;
-				if ((buf->getTypeMask() & mask_vn) == mask_vn)
-				{
-					LLStrider<LLVector3> normal_strider;
-					buf->getNormalStrider(normal_strider);
-					LLStrider<LLVector4a> vertex_strider = vertex_strider_start;
-					for (S32 j = 0; j < buf->getNumVerts(); ++j)
-					{
-						const LLVector4a& vert = *(vertex_strider++);
-						const LLVector3& norm = *(normal_strider++);
-						LLVector4a n, p;
-
-						n.set(norm.mV[VX], norm.mV[VY], norm.mV[VZ], 1.0);
-						n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
-						n.normalize3fast();
-						n.mul(draw_length);
-						p.setAdd(vert, n);
-
-						gGL.vertex3fv(vert.getF32ptr());
-						gGL.vertex3fv(p.getF32ptr());
-					}
-				}
-				gGL.end();
-
-				U32 mask_vt = LLVertexBuffer::TYPE_VERTEX | LLVertexBuffer::TYPE_TANGENT;
-				// Tangents are simple vectors and do not require reorientation via pre-scaling
-				if ((buf->getTypeMask() & mask_vt) == mask_vt)
-				{
-					LLStrider<LLVector4a> tangent_strider;
-					buf->getTangentStrider(tangent_strider);
-					LLStrider<LLVector4a> vertex_strider = vertex_strider_start;
-
-					gGL.flush();
-					gGL.diffuseColor4f(0, 1, 1, 1);
-					gGL.begin(LLRender::LINES);
-					for (S32 j = 0; j < buf->getNumVerts(); ++j)
-					{
-						const LLVector4a& vert = *(vertex_strider++);
-						LLVector4a t, p;
-
-						t.setMul(*(tangent_strider++), 1.0f);
-						t.normalize3fast();
-						t.mul(draw_length);
-						p.setAdd(vert, t);
-
-						gGL.vertex3fv(vert.getF32ptr());
-						gGL.vertex3fv(p.getF32ptr());
-					}
-					gGL.end();
-				}
-
-				buf->unmapBuffer();
-			}
-#else
 			// *HACK: Prepare to restore previous shader as other debug code depends on a simpler shader being present
 			llassert(LLGLSLShader::sCurBoundShaderPtr == &gDebugProgram);
 			LLGLSLShader* prev_shader = LLGLSLShader::sCurBoundShaderPtr;
@@ -2181,8 +2118,6 @@ void renderNormals(LLDrawable *drawablep)
 			{
 				prev_shader->bind();
 			}
-			gDebugProgram.bind();
-#endif
 		}
 
         gGL.popMatrix();

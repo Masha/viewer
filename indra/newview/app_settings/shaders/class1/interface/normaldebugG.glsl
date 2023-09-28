@@ -23,6 +23,12 @@
  * $/LicenseInfo$
  */
 
+// *NOTE: Geometry shaders have a reputation for being slow. Consider using
+// compute shaders instead, which have a reputation for being fast. This
+// geometry shader in particular seems to run fine on my machine, but I won't
+// vouch for this in performance-critical areas.
+// -Cosmic,2023-09-28
+
 out vec4 vertex_color;
 
 in vec4 normal_g[];

@@ -91,7 +91,6 @@ LLGLSLShader	gTwoTextureCompareProgram;
 LLGLSLShader	gOneTextureFilterProgram;
 LLGLSLShader	gDebugProgram;
 LLGLSLShader    gSkinnedDebugProgram;
-// TODO: Relocate this code and the name of the shader if it is useful; might remove/repurpose
 LLGLSLShader	gNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
 LLGLSLShader	gSkinnedNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
 LLGLSLShader	gClipProgram;
@@ -3012,7 +3011,6 @@ BOOL LLViewerShaderMgr::loadShadersInterface()
 		success = success && gDebugProgram.createShader(NULL, NULL);
 	}
 
-    // TODO: Relocate this code and the name of the shader if it is useful; might remove/repurpose
 	if (success)
 	{
         for (S32 variant = 0; variant < NORMAL_DEBUG_SHADER_COUNT; ++variant)
@@ -3022,6 +3020,11 @@ BOOL LLViewerShaderMgr::loadShadersInterface()
             shader.mName = "Normal Debug Shader";
             shader.mShaderFiles.clear();
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugV.glsl", GL_VERTEX_SHADER));
+            // *NOTE: Geometry shaders have a reputation for being slow.
+            // Consider using compute shaders instead, which have a reputation
+            // for being fast. This geometry shader in particular seems to run
+            // fine on my machine, but I won't vouch for this in
+            // performance-critical areas.  -Cosmic,2023-09-28
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugG.glsl", GL_GEOMETRY_SHADER));
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugF.glsl", GL_FRAGMENT_SHADER));
             shader.mRiggedVariant = &skinned_shader;

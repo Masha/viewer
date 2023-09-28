@@ -156,7 +156,6 @@ extern LLGLSLShader         gRadianceGenProgram;
 extern LLGLSLShader         gIrradianceGenProgram;
 extern LLGLSLShader			gGlowCombineFXAAProgram;
 extern LLGLSLShader			gDebugProgram;
-// TODO: Relocate this code and the name of the shader if it is useful; might remove/repurpose
 enum NormalDebugShaderVariant : S32
 {
     NORMAL_DEBUG_SHADER_DEFAULT,
