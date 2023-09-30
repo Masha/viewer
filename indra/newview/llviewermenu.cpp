@@ -2114,6 +2114,20 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
 	}
 };
 
+///////////////////// // TODO: Remove after testing
+// REBUILD TERRAIN //
+/////////////////////
+
+
+class LLAdvancedRebuildTerrain : public view_listener_t
+{
+	bool handleEvent(const LLSD& userdata)
+	{
+        gPipeline.rebuildTerrain();
+		return true;
+	}
+};
+
 ////////////////////
 // EVENT Recorder //
 ///////////////////
@@ -9484,6 +9498,7 @@ void initialize_menus()
 	view_listener_t::addMenu(new LLAdvancedClickRenderProfile(), "Advanced.ClickRenderProfile");
 	view_listener_t::addMenu(new LLAdvancedClickRenderBenchmark(), "Advanced.ClickRenderBenchmark");
 	view_listener_t::addMenu(new LLAdvancedPurgeShaderCache(), "Advanced.ClearShaderCache");
+	view_listener_t::addMenu(new LLAdvancedRebuildTerrain(), "Advanced.RebuildTerrain");
 
 	#ifdef TOGGLE_HACKED_GODLIKE_VIEWER
 	view_listener_t::addMenu(new LLAdvancedHandleToggleHackedGodmode(), "Advanced.HandleToggleHackedGodmode");

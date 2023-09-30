@@ -133,6 +133,8 @@ public:
 
     // rebuild all LLVOVolume render batches
     void rebuildDrawInfo();
+    // Rebuild all terrain
+    void rebuildTerrain();
 
     // Clear LLFace mVertexBuffer pointers
 	void resetVertexBuffers(LLDrawable* drawable);

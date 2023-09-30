@@ -1105,6 +1105,11 @@ void LLViewerRegion::dirtyHeights()
 	}
 }
 
+void LLViewerRegion::dirtyAllPatches()
+{
+    getLand().dirtyAllPatches();
+}
+
 //physically delete the cache entry
 void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
 {	
