@@ -102,8 +102,15 @@ public:
 	LLVector3 getPointAgent(const U32 x, const U32 y) const; // get the point at the offset.
 	LLVector2 getTexCoords(const U32 x, const U32 y) const;
 
+    // Per-vertex normals
 	void calcNormal(const U32 x, const U32 y, const U32 stride);
 	const LLVector3 &getNormal(const U32 x, const U32 y) const;
+
+    // Per-triangle normals for flat edges
+    // *NOTE: This is currently not cached
+	void calcNormalFlat(LLVector3& normal_out, const U32 x, const U32 y, const U32 index /* 0 or 1 */);
+    // Debug function to test behavior of calcNormalFlat for all terrain quads
+	void calcNormalFlat(const U32 x, const U32 y, const U32 index /* 0 or 1 */);
 
 	void eval(const U32 x, const U32 y, const U32 stride,
 				LLVector3 *vertex, LLVector3 *normal, LLVector2 *tex0, LLVector2 *tex1);
